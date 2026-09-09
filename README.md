@@ -14,7 +14,25 @@ DeepSeek peak hours** and **when the current peak ends**, based on your computer
 - 🔔 **Notifications** when the status changes and **shortly before** the change.
 - 🛠️ **Fully configurable** schedule (windows, days, notifications).
 
-## Installation (development / local)
+## Installation
+
+### From the GitHub Release (recommended)
+
+Download the pre-built `deepseek-peak-hour-monitoring.vsix` from the
+[latest GitHub Release](https://github.com/iliasgnrs/deepseek-peak-hour-monitoring/releases/latest)
+and install it from the command line:
+
+```bash
+code --install-extension deepseek-peak-hour-monitoring.vsix
+```
+
+or from within VS Code: open the **Extensions** view (`Ctrl+Shift+X`), click the
+`...` menu and choose **Install from VSIX...**, then select the downloaded file.
+
+Installing this way makes the extension available **globally, in all of your
+workspaces**.
+
+### Development / local
 
 1. Open the project folder in VS Code.
 2. Install dependencies and compile:
