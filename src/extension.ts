@@ -127,6 +127,11 @@ function localHhmm(d: Date): string {
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+/** UTC-time string (HH:MM) for a Date. */
+function utcHhmm(d: Date): string {
+    return d.toISOString().slice(11, 16);
+}
+
 /** Human friendly remaining duration, e.g. "in ~2 hours" / "in ~15 minutes". */
 function formatRemaining(ms: number): string {
     const totalMin = Math.max(0, Math.round(ms / 60000));
@@ -432,8 +437,8 @@ function readConfig(): void {
 
 function describeTransition(b: Boundary): string {
     return b.type === 'start'
-        ? `The next peak starts at ${localHhmm(b.when)} local time (${formatRemaining(b.when.getTime() - Date.now())}).`
-        : `The peak ends at ${localHhmm(b.when)} local time (${formatRemaining(b.when.getTime() - Date.now())}).`;
+        ? `The next peak starts at ${localHhmm(b.when)} local (${utcHhmm(b.when)} UTC), ${formatRemaining(b.when.getTime() - Date.now())}.`
+        : `The peak ends at ${localHhmm(b.when)} local (${utcHhmm(b.when)} UTC), ${formatRemaining(b.when.getTime() - Date.now())}.`;
 }
 
 function updateStatusBar(now: Date): void {

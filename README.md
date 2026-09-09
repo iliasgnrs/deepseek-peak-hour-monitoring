@@ -98,8 +98,9 @@ For example, if your peaks are 02:00–05:00 and 09:00–12:00 UTC, Sat-Sun:
 ## How "computer time" works
 
 The extension uses your computer's clock, but **classification is done in UTC** — so it
-holds true wherever you are. The times it shows you (e.g. "ends 04:00") are converted to
-your **local timezone** for convenience.
+holds true wherever you are. Transition times are shown in **both** your **local timezone**
+and **UTC** for convenience, e.g. *"The next peak starts at 04:00 local (01:00 UTC)"*.
+(It automatically follows your machine's timezone, including daylight-saving changes.)
 
 ## Structure
 
