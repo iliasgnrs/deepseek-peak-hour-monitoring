@@ -1,0 +1,87 @@
+{
+  "name": "deepseek-peak-hour-monitoring",
+  "displayName": "DeepSeek Peak Hour Monitoring",
+  "description": "Δείχνει στη status bar αν είμαστε εντός ή εκτός DeepSeek peak hours (χρεώσεις/χρήση) και πότε τελειώνει το τρέχον peak. Ρυθμιζόμενο ωράριο.",
+  "version": "0.0.1",
+  "publisher": "iliasgnrs",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "deepseek",
+    "peak hours",
+    "off-peak",
+    "status bar",
+    "monitoring"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "deepseekPeak.showStatus",
+        "title": "DeepSeek Peak Hours: Εμφάνιση κατάστασης τώρα"
+      },
+      {
+        "command": "deepseekPeak.openSettings",
+        "title": "DeepSeek Peak Hours: Ρυθμίσεις"
+      }
+    ],
+    "configuration": {
+      "title": "DeepSeek Peak Hours",
+      "properties": {
+        "deepseekPeak.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ενεργοποίηση/απενεργοποίηση της ένδειξης στη status bar."
+        },
+        "deepseekPeak.windowsUtc": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["01:00-04:00", "06:00-10:00"],
+          "description": "Παράθυρα peak hours σε UTC, μορφή \"HH:MM-HH:MM\" (έναρξη πριν τη λήξη, εντός της ίδιας ημέρας). Default = DeepSeek."
+        },
+        "deepseekPeak.weekdays": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6
+          },
+          "default": [1, 2, 3, 4, 5],
+          "description": "Ημέρες εβδομάδας που ισχύει το peak (0 = Κυριακή, ..., 6 = Σάββατο). Default Δευτέρα έως Παρασκευή."
+        },
+        "deepseekPeak.notifyOnChange": {
+          "type": "boolean",
+          "default": true,
+          "description": "Να εμφανίζεται ειδοποίηση όταν αλλάζει η κατάσταση (μπαίνουμε ή βγαίνουμε από peak)."
+        },
+        "deepseekPeak.notifyMinutesBefore": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "maximum": 120,
+          "description": "Λεπτά πριν από την αλλαγή κατάστασης στα οποία θα ειδοποιηθούμε (π.χ. \"peak τελειώνει σε ~10 λεπτά\"). 0 = απενεργοποίηση."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -w -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.4.0"
+  }
+}
