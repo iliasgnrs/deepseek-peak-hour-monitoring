@@ -2,7 +2,7 @@
   "name": "deepseek-peak-hour-monitoring",
   "displayName": "DeepSeek Peak Hour Monitoring",
   "description": "Shows in the status bar whether you are inside or outside DeepSeek peak hours (pricing/usage), when the current peak ends, and notifies you about active DeepSeek status incidents (status.deepseek.com). Configurable.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "iliasgnrs",
   "license": "MIT",
   "engines": {
@@ -50,7 +50,10 @@
           "items": {
             "type": "string"
           },
-          "default": ["01:00-04:00", "06:00-10:00"],
+          "default": [
+            "01:00-04:00",
+            "06:00-10:00"
+          ],
           "description": "Peak hour windows in UTC, format \"HH:MM-HH:MM\" (start before end, within the same day). Default = DeepSeek."
         },
         "deepseekPeak.weekdays": {
@@ -60,7 +63,13 @@
             "minimum": 0,
             "maximum": 6
           },
-          "default": [1, 2, 3, 4, 5],
+          "default": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
           "description": "Weekdays on which the peak applies (0 = Sunday, ..., 6 = Saturday). Default Monday to Friday."
         },
         "deepseekPeak.notifyOnChange": {
