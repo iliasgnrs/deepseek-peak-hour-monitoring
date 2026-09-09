@@ -35,12 +35,12 @@ const DEFAULT_WEEKDAYS = [1, 2, 3, 4, 5]; // Mon - Fri
 function parseMinute(s: string): number {
     const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
     if (!m) {
-        throw new Error(`Μη έγκυρη ώρα "${s}" (θέλουμε μορφή HH:MM)`);
+        throw new Error(`Invalid time "${s}" (expected HH:MM format)`);
     }
     const h = Number(m[1]);
     const min = Number(m[2]);
     if (h > 23 || min > 59) {
-        throw new Error(`Μη έγκυρη ώρα "${s}"`);
+        throw new Error(`Invalid time "${s}"`);
     }
     return h * 60 + min;
 }
@@ -52,12 +52,12 @@ function parseWindows(list: string[]): TimeWindow[] {
     return list.map((w) => {
         const parts = w.split('-');
         if (parts.length !== 2) {
-            throw new Error(`Μη έγκυρο παράθυρο "${w}" (θέλουμε "HH:MM-HH:MM")`);
+            throw new Error(`Invalid window "${w}" (expected "HH:MM-HH:MM")`);
         }
         const start = parseMinute(parts[0]);
         const end = parseMinute(parts[1]);
         if (end <= start) {
-            throw new Error(`Το παράθυρο "${w}" πρέπει να τελειώνει μετά την έναρξη (εντός ίδιας ημέρας UTC)`);
+            throw new Error(`The window "${w}" must end after it starts (within the same UTC day)`);
         }
         return { startMin: start, endMin: end };
     });
@@ -121,21 +121,21 @@ function localHhmm(d: Date): string {
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-/** Human friendly remaining duration, e.g. "σε ~2 ώρες" / "σε ~15 λεπτά". */
+/** Human friendly remaining duration, e.g. "in ~2 hours" / "in ~15 minutes". */
 function formatRemaining(ms: number): string {
     const totalMin = Math.max(0, Math.round(ms / 60000));
     if (totalMin < 1) {
-        return 'τώρα';
+        return 'now';
     }
     if (totalMin < 60) {
-        return `σε ~${totalMin} λεπτά`;
+        return `in ~${totalMin} minutes`;
     }
     const h = Math.floor(totalMin / 60);
     const m = totalMin % 60;
     if (m === 0) {
-        return `σε ~${h} ώρες`;
+        return `in ~${h} hours`;
     }
-    return `σε ~${h} ώρες ${m} λεπτά`;
+    return `in ~${h} hours ${m} minutes`;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,8 +163,8 @@ function readConfig(): void {
 
 function describeTransition(b: Boundary): string {
     return b.type === 'start'
-        ? `Το επόμενο peak ξεκινά ${localHhmm(b.when)} τοπική ώρα (${formatRemaining(b.when.getTime() - Date.now())}).`
-        : `Το peak τελειώνει ${localHhmm(b.when)} τοπική ώρα (${formatRemaining(b.when.getTime() - Date.now())}).`;
+        ? `The next peak starts at ${localHhmm(b.when)} local time (${formatRemaining(b.when.getTime() - Date.now())}).`
+        : `The peak ends at ${localHhmm(b.when)} local time (${formatRemaining(b.when.getTime() - Date.now())}).`;
 }
 
 function updateStatusBar(now: Date): void {
@@ -179,13 +179,13 @@ function updateStatusBar(now: Date): void {
     if (inPeak) {
         const endsAt = boundary && boundary.type === 'end' ? boundary.when : now;
         const remaining = endsAt.getTime() - now.getTime();
-        statusBar.text = `$(flame) Peak · τέλος ${localHhmm(endsAt)} (${formatRemaining(remaining)})`;
+        statusBar.text = `$(flame) Peak · ends ${localHhmm(endsAt)} (${formatRemaining(remaining)})`;
         statusBar.color = new vscode.ThemeColor('charts.red');
-        statusBar.tooltip = `ΕΙΣΤΕ ΕΝΤΟΣ DeepSeek peak hours (ακριβότερη/περιορισμένη χρήση).\n${boundary ? describeTransition(boundary) : ''}`;
+        statusBar.tooltip = `You are INSIDE DeepSeek peak hours (more expensive/limited usage).\n${boundary ? describeTransition(boundary) : ''}`;
     } else {
         statusBar.text = `$(check) Off-peak`;
         statusBar.color = new vscode.ThemeColor('charts.green');
-        statusBar.tooltip = `Είστε ΕΚΤΟΣ DeepSeek peak hours.\n${boundary ? describeTransition(boundary) : 'Κανένα peak σε προγραμματισμό.'}`;
+        statusBar.tooltip = `You are OUTSIDE DeepSeek peak hours.\n${boundary ? describeTransition(boundary) : 'No peak scheduled.'}`;
     }
 
     statusBar.show();
@@ -200,11 +200,11 @@ function maybeNotify(now: Date, inPeak: boolean, boundary: Boundary | undefined)
     if (cfg.notifyOnChange && lastInPeak !== undefined && lastInPeak !== inPeak) {
         if (inPeak) {
             void vscode.window.showInformationMessage(
-                `DeepSeek Peak Hours: Μπήκατε σε peak hours (ακριβότερη χρήση). ${boundary ? describeTransition(boundary) : ''}`
+                `DeepSeek Peak Hours: You have entered peak hours (more expensive usage). ${boundary ? describeTransition(boundary) : ''}`
             );
         } else {
             void vscode.window.showInformationMessage(
-                'DeepSeek Peak Hours: Τελείωσαν τα peak hours — είστε πλέον off-peak. ✓'
+                'DeepSeek Peak Hours: Peak hours have ended — you are now off-peak. ✓'
             );
         }
     }
@@ -219,8 +219,8 @@ function maybeNotify(now: Date, inPeak: boolean, boundary: Boundary | undefined)
         lastWarnedBoundaryMs = boundary.when.getTime();
         const msg =
             boundary.type === 'start'
-                ? `Το DeepSeek peak ξεκινά ${formatRemaining(msUntil)} (${localHhmm(boundary.when)} τοπική).`
-                : `Το DeepSeek peak τελειώνει ${formatRemaining(msUntil)} (${localHhmm(boundary.when)} τοπική).`;
+                ? `The DeepSeek peak starts ${formatRemaining(msUntil)} (${localHhmm(boundary.when)} local).`
+                : `The DeepSeek peak ends ${formatRemaining(msUntil)} (${localHhmm(boundary.when)} local).`;
         void vscode.window.showInformationMessage(`DeepSeek Peak Hours: ${msg}`);
     }
 }
@@ -240,13 +240,13 @@ function showStatusNow(): void {
         const inPeak = isInPeak(now, cfg);
         const boundary = nextBoundary(now, cfg);
         const lines = [
-            `Τώρα (τοπική ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}): ${inPeak ? 'ΕΝΤΟΣ peak' : 'ΕΚΤΟΣ peak'}`,
-            `Τώρα (UTC ${now.toISOString().slice(11, 16)}): ${inPeak ? 'peak' : 'off-peak'}`,
+            `Now (local ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}): ${inPeak ? 'INSIDE peak' : 'OUTSIDE peak'}`,
+            `Now (UTC ${now.toISOString().slice(11, 16)}): ${inPeak ? 'peak' : 'off-peak'}`,
         ];
         if (boundary) {
             lines.push(describeTransition(boundary));
         } else {
-            lines.push('Κανένα peak σε προγραμματισμό.');
+            lines.push('No peak scheduled.');
         }
         void vscode.window.showInformationMessage(lines.join('\n'), { modal: false });
     } catch (err) {

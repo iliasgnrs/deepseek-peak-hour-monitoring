@@ -1,49 +1,49 @@
 # DeepSeek Peak Hour Monitoring
 
-Ένα VS Code extension που σας δείχνει **στη status bar** αν βρίσκεστε **εντός ή εκτός
-DeepSeek peak hours** και **πότε τελειώνει το τρέχον peak**, με βάση το ρολόι του
-υπολογιστή σας (η κατάταξη γίνεται πάντα σε **UTC**, όπως ορίζει το DeepSeek).
+A VS Code extension that shows you **in the status bar** whether you are **inside or outside
+DeepSeek peak hours** and **when the current peak ends**, based on your computer's clock
+(classification is always done in **UTC**, as DeepSeek defines it).
 
-> **Τι είναι τα peak hours του DeepSeek** (default): Δευτέρα–Παρασκευή, **01:00–04:00**
-> και **06:00–10:00 UTC**. Τις υπόλοιπες ώρες είστε **off-peak**.
+> **What DeepSeek peak hours are** (default): Monday–Friday, **01:00–04:00** and
+> **06:00–10:00 UTC**. At all other times you are **off-peak**.
 
-## Χαρακτηριστικά
+## Features
 
-- 🟢/🔴 Ένδειξη στη **status bar**: `Off-peak` ή `Peak · τέλος 04:00 (σε ~45 λεπτά)`.
-- ⏱️ **Αντίστροφη μέτρηση** για το πότε τελειώνει το τρέχον peak (ή πότε αρχίζει το επόμενο).
-- 🔔 **Ειδοποιήσεις** όταν αλλάζει η κατάσταση και **λίγο πριν** την αλλαγή.
-- 🛠️ **Πλήρως ρυθμιζόμενο** ωράριο (παράθυρα, ημέρες, ειδοποιήσεις).
+- 🟢/🔴 **Status bar** indicator: `Off-peak` or `Peak · ends 04:00 (in ~45 min)`.
+- ⏱️ **Countdown** for when the current peak ends (or when the next one starts).
+- 🔔 **Notifications** when the status changes and **shortly before** the change.
+- 🛠️ **Fully configurable** schedule (windows, days, notifications).
 
-## Εγκατάσταση (development / local)
+## Installation (development / local)
 
-1. Ανοίξτε το φάκελο του project στο VS Code.
-2. Εγκαταστήστε τις εξαρτήσεις και μεταγλωττίστε:
+1. Open the project folder in VS Code.
+2. Install dependencies and compile:
    ```bash
    npm install
    npm run compile
    ```
-3. Πατήστε **F5** (ή Run → Start Debugging) για να ανοίξει ένα
-   *Extension Development Host* με το extension φορτωμένο.
+3. Press **F5** (or Run → Start Debugging) to open an
+   *Extension Development Host* with the extension loaded.
 
-Θα δείτε την ένδειξη αριστερά στη status bar. Πατώντας πάνω της ανοίγει ένα
-παράθυρο με αναλυτική κατάσταση (τοπική ώρα + UTC + πότε αλλάζει).
+You will see the indicator on the left side of the status bar. Clicking it opens a
+window with detailed status (local time + UTC + when it changes).
 
-## Ρυθμίσεις
+## Settings
 
-Ανοίξτε τις ρυθμίσεις (`Ctrl+,`) και ψάξτε για `deepseekPeak` (ή χρησιμοποιήστε
-την εντολή **DeepSeek Peak Hours: Ρυθμίσεις** από την Command Palette).
+Open the settings (`Ctrl+,`) and search for `deepseekPeak` (or use the
+**DeepSeek Peak Hours: Settings** command from the Command Palette).
 
-| Ρύθμιση | Τύπος | Default | Περιγραφή |
+| Setting | Type | Default | Description |
 |---|---|---|---|
-| `deepseekPeak.enabled` | boolean | `true` | Εμφάνιση/απόκρυψη ένδειξης στη status bar |
-| `deepseekPeak.windowsUtc` | string[] | `["01:00-04:00", "06:00-10:00"]` | Παράθυρα peak σε **UTC**, μορφή `"HH:MM-HH:MM"` |
-| `deepseekPeak.weekdays` | number[] | `[1,2,3,4,5]` | Ημέρες εβδομάδας (0=Κυρ … 6=Σάβ) |
-| `deepseekPeak.notifyOnChange` | boolean | `true` | Ειδοποίηση όταν αλλάζει κατάσταση |
-| `deepseekPeak.notifyMinutesBefore` | number | `10` | Λεπτά πριν την αλλαγή για προειδοποίηση (0=απενεργ.) |
+| `deepseekPeak.enabled` | boolean | `true` | Show/hide the status bar indicator |
+| `deepseekPeak.windowsUtc` | string[] | `["01:00-04:00", "06:00-10:00"]` | Peak windows in **UTC**, format `"HH:MM-HH:MM"` |
+| `deepseekPeak.weekdays` | number[] | `[1,2,3,4,5]` | Weekdays (0=Sun … 6=Sat) |
+| `deepseekPeak.notifyOnChange` | boolean | `true` | Notify when the status changes |
+| `deepseekPeak.notifyMinutesBefore` | number | `10` | Minutes before the change to warn (0=disabled) |
 
-### Παράδειγμα: αλλαγή ωραρίου
+### Example: changing the schedule
 
-Αν π.χ. τα peak σας είναι 02:00–05:00 και 09:00–12:00 UTC, Σάβ-Κυρ:
+For example, if your peaks are 02:00–05:00 and 09:00–12:00 UTC, Sat-Sun:
 
 ```json
 {
@@ -52,21 +52,21 @@ DeepSeek peak hours** και **πότε τελειώνει το τρέχον pea
 }
 ```
 
-## Πώς λειτουργεί το «computer time»
+## How "computer time" works
 
-Το extension χρησιμοποιεί το ρολόι του υπολογιστή σας, αλλά η **ταξινόμηση γίνεται σε
-UTC** — έτσι ισχύει όπου κι αν βρίσκεστε. Οι ώρες που σας δείχνει (π.χ. «τέλος 04:00»)
-μετατρέπονται στην **τοπική σας ζώνη** ώρας για ευκολία.
+The extension uses your computer's clock, but **classification is done in UTC** — so it
+holds true wherever you are. The times it shows you (e.g. "ends 04:00") are converted to
+your **local timezone** for convenience.
 
-## Δομή
+## Structure
 
 ```
-├── package.json      # metadata, commands, ρυθμίσεις
+├── package.json      # metadata, commands, settings
 ├── tsconfig.json
-├── src/extension.ts  # όλη η λογική (peak math, status bar, notifications)
+├── src/extension.ts  # all the logic (peak math, status bar, notifications)
 └── .vscode/          # debug (F5) + build task
 ```
 
-## Άδεια
+## License
 
 MIT
