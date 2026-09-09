@@ -2,7 +2,7 @@
   "name": "deepseek-peak-hour-monitoring",
   "displayName": "DeepSeek Peak Hour Monitoring",
   "description": "Shows in the status bar whether you are inside or outside DeepSeek peak hours (pricing/usage), when the current peak ends, and notifies you about active DeepSeek status incidents (status.deepseek.com). Configurable.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "iliasgnrs",
   "license": "MIT",
   "engines": {
