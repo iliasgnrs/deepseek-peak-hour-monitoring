@@ -253,6 +253,27 @@ function describeStatusFeed(inc: FeedIncident): string {
     return `[${inc.status}] ${inc.title}`;
 }
 
+/** Whether an incident status is severe (major outage / unavailable / ...). */
+function isSevereStatus(s: string): boolean {
+    return /major|partial_outage|full_outage|outage|unavailable|critical|severe|\bdown\b/i.test(s);
+}
+
+/**
+ * Overall health derived from the currently active incidents.
+ * green = all good; medium = some issue; serious = major outage/unavailable.
+ */
+type Health = 'green' | 'medium' | 'serious';
+
+function overallHealth(active: FeedIncident[]): Health {
+    if (active.length === 0) {
+        return 'green';
+    }
+    if (active.some((i) => isSevereStatus(i.status))) {
+        return 'serious';
+    }
+    return 'medium';
+}
+
 let feedStatusBar: vscode.StatusBarItem;
 let statusTimer: NodeJS.Timeout | undefined;
 let knownActive = new Map<string, FeedIncident>();
@@ -313,18 +334,25 @@ async function checkStatusFeed(): Promise<void> {
     }
     knownActive = new Map(active);
 
-    // Status-bar indicator (only shown while something is wrong).
-    if (active.size > 0) {
-        feedStatusBar.text = `$(error) DeepSeek issue (${active.size})`;
-        feedStatusBar.color = new vscode.ThemeColor('charts.red');
+    // Status-bar indicator (always shown while monitoring is on), colour-coded
+    // by overall health: green = normal, orange = medium issue, red = serious.
+    const health = overallHealth(lastActiveList);
+    if (health === 'green') {
+        feedStatusBar.text = '$(check) Normal operation';
+        feedStatusBar.color = new vscode.ThemeColor('charts.green');
+        feedStatusBar.tooltip = 'DeepSeek systems are reported operational (normal operation).';
+    } else {
+        feedStatusBar.text =
+            health === 'serious'
+                ? `$(error) Serious issue (${active.size})`
+                : `$(warning) Medium issue (${active.size})`;
+        feedStatusBar.color = new vscode.ThemeColor(health === 'serious' ? 'charts.red' : 'charts.orange');
         feedStatusBar.tooltip =
             `Active DeepSeek status incident(s):\n` +
             lastActiveList.map((i) => `• ${describeStatusFeed(i)}`).join('\n') +
             '\n\nClick for details.';
-        feedStatusBar.show();
-    } else {
-        feedStatusBar.hide();
     }
+    feedStatusBar.show();
 
     if (!cfg.notifyOnStatusIncident) {
         return;

@@ -17,8 +17,9 @@ working well.
 - ⏱️ **Countdown** for when the current peak ends (or when the next one starts).
 - 🔔 **Notifications** when the status changes and **shortly before** the change.
 - 🛠️ **Fully configurable** schedule (windows, days, notifications).
-- 🚨 **Status monitoring** (`status.deepseek.com`): a red `DeepSeek issue (n)` indicator and
-  a notification when DeepSeek reports an active incident.
+- 🚨 **Status monitoring** (`status.deepseek.com`): an always-visible, colour-coded indicator
+  next to the peak status (`Normal operation` 🟢 / `Medium issue` 🟠 / `Serious issue` 🔴)
+  with a notification when an incident starts and another when it is resolved.
 
 ## Installation
 
@@ -72,16 +73,16 @@ Open the settings (`Ctrl+,`) and search for `deepseekPeak` (or use the
 ### Status monitoring
 
 While VS Code is running, the extension polls the DeepSeek status feed every
-`statusCheckIntervalMinutes` minutes. Whenever the feed shows an incident that is **not
-resolved** (e.g. `investigating`, `identified`, `monitoring`, `degraded`, `outage`), you
-get:
+`statusCheckIntervalMinutes` minutes. Next to the peak indicator it always shows a
+colour-coded health indicator based on the most recent feed:
 
-- a red **`$(error) DeepSeek issue (n)`** indicator in the status bar (click it to see the
-details and links), and
-- a **notification** when the incident starts, and another when it is resolved.
+- 🟢 **`$(check) Normal operation`** — no active incident; DeepSeek reports all clear.
+- 🟠 **`$(warning) Medium issue (n)`** — an ongoing issue (e.g. `investigating`,
+  `identified`, `monitoring`, `degraded performance`).
+- 🔴 **`$(error) Serious issue (n)`** — a major outage / service unavailable.
 
-When DeepSeek reports **no active incident**, the status bar stays clean and nothing is
-shown.
+Click the indicator to see the details and links. You also get a **notification** when an
+incident starts, and another when it is resolved.
 
 ### Example: changing the schedule
 
