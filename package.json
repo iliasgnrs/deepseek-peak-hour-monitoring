@@ -1,7 +1,7 @@
 {
   "name": "deepseek-peak-hour-monitoring",
   "displayName": "DeepSeek Peak Hour Monitoring",
-  "description": "Shows in the status bar whether you are inside or outside DeepSeek peak hours (pricing/usage) and when the current peak ends. Configurable schedule.",
+  "description": "Shows in the status bar whether you are inside or outside DeepSeek peak hours (pricing/usage), when the current peak ends, and notifies you about active DeepSeek status incidents (status.deepseek.com). Configurable.",
   "version": "0.0.1",
   "publisher": "iliasgnrs",
   "license": "MIT",
@@ -27,6 +27,10 @@
       {
         "command": "deepseekPeak.showStatus",
         "title": "DeepSeek Peak Hours: Show status now"
+      },
+      {
+        "command": "deepseekPeak.showStatusFeed",
+        "title": "DeepSeek Status: Show incidents now"
       },
       {
         "command": "deepseekPeak.openSettings",
@@ -70,6 +74,28 @@
           "minimum": 0,
           "maximum": 120,
           "description": "Minutes before a status change at which to notify (e.g. \"peak ends in ~10 minutes\"). 0 = disabled."
+        },
+        "deepseekPeak.monitorStatus": {
+          "type": "boolean",
+          "default": true,
+          "description": "Monitor the DeepSeek status feed (status.deepseek.com) and surface active incidents."
+        },
+        "deepseekPeak.statusFeedUrl": {
+          "type": "string",
+          "default": "https://status.deepseek.com/feed.rss",
+          "description": "RSS/Atom feed URL used for DeepSeek status monitoring. Supports both feed.rss and feed.atom."
+        },
+        "deepseekPeak.statusCheckIntervalMinutes": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 120,
+          "description": "How often (in minutes) to check the DeepSeek status feed for incidents."
+        },
+        "deepseekPeak.notifyOnStatusIncident": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a notification when a DeepSeek status incident starts or is resolved."
         }
       }
     }

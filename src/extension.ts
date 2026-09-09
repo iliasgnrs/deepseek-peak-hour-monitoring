@@ -1,3 +1,4 @@
+import * as https from 'https';
 import * as vscode from 'vscode';
 
 // ---------------------------------------------------------------------------
@@ -23,6 +24,10 @@ interface Cfg {
     weekdays: number[]; // 0 = Sunday .. 6 = Saturday
     notifyOnChange: boolean;
     notifyMinutesBefore: number;
+    monitorStatus: boolean;
+    statusFeedUrl: string;
+    statusCheckIntervalMinutes: number;
+    notifyOnStatusIncident: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -31,6 +36,7 @@ interface Cfg {
 
 const DEFAULT_WINDOWS = ['01:00-04:00', '06:00-10:00'];
 const DEFAULT_WEEKDAYS = [1, 2, 3, 4, 5]; // Mon - Fri
+const DEFAULT_STATUS_FEED = 'https://status.deepseek.com/feed.rss';
 
 function parseMinute(s: string): number {
     const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
@@ -139,12 +145,243 @@ function formatRemaining(ms: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// DeepSeek status monitoring (status.deepseek.com RSS/Atom feed)
+// ---------------------------------------------------------------------------
+
+interface FeedIncident {
+    id: string;
+    title: string;
+    link: string;
+    pubDate: string;
+    status: string;
+}
+
+/** GET a URL over HTTPS and return the body as text. */
+function httpGetText(url: string, timeoutMs = 15000): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const target = new URL(url);
+        const req = https.get(
+            target,
+            { headers: { 'User-Agent': 'DeepSeekPeakHourMonitoring/0.0.1 (VS Code extension)' } },
+            (res) => {
+                const code = res.statusCode ?? 0;
+                const loc = res.headers.location;
+                if (code >= 300 && code < 400 && loc) {
+                    res.resume();
+                    resolve(httpGetText(new URL(loc, target).toString(), timeoutMs));
+                    return;
+                }
+                if (code !== 200) {
+                    res.resume();
+                    reject(new Error(`HTTP ${code}`));
+                    return;
+                }
+                const chunks: Buffer[] = [];
+                res.on('data', (c: Buffer) => chunks.push(c));
+                res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+            }
+        );
+        req.on('error', reject);
+        req.setTimeout(timeoutMs, () => req.destroy(new Error('request timed out')));
+    });
+}
+
+/** Decode common XML/HTML entities. */
+function unescapeXml(s: string): string {
+    return s
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&apos;/g, "'")
+        .replace(/&#x([0-9a-fA-F]+);/g, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
+        .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(Number(d)))
+        .replace(/&amp;/g, '&');
+}
+
+/** Strip HTML tags, collapsing whitespace. */
+function stripHtml(s: string): string {
+    return s
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/** Parse an RSS 2.0 or Atom feed into its incidents/entries. */
+function parseFeed(xml: string): FeedIncident[] {
+    const isAtom = /<feed\b/i.test(xml);
+    const itemRe = isAtom ? /<entry\b[^>]*>([\s\S]*?)<\/entry>/gi : /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+    const out: FeedIncident[] = [];
+    const field = (block: string, tag: string): string => {
+        const m = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(block);
+        return m ? unescapeXml(m[1]) : '';
+    };
+    let m: RegExpExecArray | null;
+    while ((m = itemRe.exec(xml))) {
+        const block = m[1];
+        const id = field(block, isAtom ? 'id' : 'guid');
+        const title = field(block, 'title');
+        const hrefM = /<link\b[^>]*href="([^"]*)"/i.exec(block);
+        const innerM = /<link\b[^>]*>([\s\S]*?)<\/link>/i.exec(block);
+        const link = unescapeXml(hrefM ? hrefM[1] : innerM ? innerM[1] : '');
+        const pubDate = field(block, isAtom ? 'updated' : 'pubDate');
+        const desc = field(block, isAtom ? 'summary' : 'description');
+        const text = stripHtml(desc);
+        const st = /status\s*:\s*([a-z_]+)/i.exec(text);
+        const status = st ? st[1].toLowerCase() : '';
+        out.push({ id, title, link, pubDate, status });
+    }
+    return out;
+}
+
+/** Whether a feed entry's status means an incident is still ongoing. */
+function isActiveIncident(inc: FeedIncident): boolean {
+    const t = inc.status;
+    if (!t) {
+        return false;
+    }
+    if (/resolved|operational|completed/.test(t)) {
+        return false; // all clear
+    }
+    if (/maintenance|scheduled/.test(t)) {
+        return false; // planned, not an outage
+    }
+    return true; // investigating / identified / monitoring / degraded / outage ...
+}
+
+function describeStatusFeed(inc: FeedIncident): string {
+    return `[${inc.status}] ${inc.title}`;
+}
+
+let feedStatusBar: vscode.StatusBarItem;
+let statusTimer: NodeJS.Timeout | undefined;
+let knownActive = new Map<string, FeedIncident>();
+let lastActiveList: FeedIncident[] = [];
+let statusFeedSeen = false;
+let lastStatusError = '';
+
+function showStatusFeedNow(): void {
+    const lines =
+        lastActiveList.length > 0
+            ? lastActiveList.map((i) => `• ${describeStatusFeed(i)}\n  ${i.link}`)
+            : ['No active incidents — DeepSeek systems are reported operational.'];
+    void vscode.window.showInformationMessage('DeepSeek Status: ' + lines.join('\n'), { modal: false });
+}
+
+async function checkStatusFeed(): Promise<void> {
+    if (!cfg.monitorStatus) {
+        feedStatusBar.hide();
+        return;
+    }
+    const url = (cfg.statusFeedUrl || '').trim() || DEFAULT_STATUS_FEED;
+    let incidents: FeedIncident[];
+    try {
+        const xml = await httpGetText(url);
+        incidents = parseFeed(xml);
+        lastStatusError = '';
+    } catch (err) {
+        feedStatusBar.hide();
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg !== lastStatusError) {
+            lastStatusError = msg;
+            void vscode.window.showWarningMessage(`DeepSeek Status: could not reach the status feed (${url}). ${msg}`);
+        }
+        return;
+    }
+
+    // Keep only currently-active incidents.
+    const active = new Map<string, FeedIncident>();
+    for (const inc of incidents) {
+        if (inc.id && isActiveIncident(inc)) {
+            active.set(inc.id, inc);
+        }
+    }
+    lastActiveList = [...active.values()];
+
+    // Diff against what we knew before.
+    const newlyActive: FeedIncident[] = [];
+    for (const id of active.keys()) {
+        if (!knownActive.has(id)) {
+            newlyActive.push(active.get(id)!);
+        }
+    }
+    const newlyResolved: FeedIncident[] = [];
+    for (const inc of knownActive.values()) {
+        if (!active.has(inc.id)) {
+            newlyResolved.push(inc);
+        }
+    }
+    knownActive = new Map(active);
+
+    // Status-bar indicator (only shown while something is wrong).
+    if (active.size > 0) {
+        feedStatusBar.text = `$(error) DeepSeek issue (${active.size})`;
+        feedStatusBar.color = new vscode.ThemeColor('charts.red');
+        feedStatusBar.tooltip =
+            `Active DeepSeek status incident(s):\n` +
+            lastActiveList.map((i) => `• ${describeStatusFeed(i)}`).join('\n') +
+            '\n\nClick for details.';
+        feedStatusBar.show();
+    } else {
+        feedStatusBar.hide();
+    }
+
+    if (!cfg.notifyOnStatusIncident) {
+        return;
+    }
+
+    // First poll that already sees an active incident -> single heads-up.
+    if (!statusFeedSeen && active.size > 0) {
+        const first = lastActiveList[0];
+        void vscode.window.showWarningMessage(
+            `DeepSeek Status: There is an ongoing issue — ${first.title} (${first.status}). ${first.link}`
+        );
+    }
+
+    for (const inc of newlyActive) {
+        void vscode.window.showWarningMessage(
+            `DeepSeek Status: New issue — ${inc.title} (${inc.status}). ${inc.link}`
+        );
+    }
+    for (const inc of newlyResolved) {
+        void vscode.window.showInformationMessage(
+            `DeepSeek Status: Resolved ✓ — ${inc.title} (${inc.link})`
+        );
+    }
+    statusFeedSeen = true;
+}
+
+function scheduleStatus(): void {
+    if (statusTimer) {
+        clearInterval(statusTimer);
+        statusTimer = undefined;
+    }
+    if (!cfg.monitorStatus) {
+        return;
+    }
+    const intervalMs = Math.max(1, Math.floor(cfg.statusCheckIntervalMinutes || 5)) * 60000;
+    statusTimer = setInterval(() => {
+        void checkStatusFeed();
+    }, intervalMs);
+}
+
+// ---------------------------------------------------------------------------
 // Extension
 // ---------------------------------------------------------------------------
 
 let statusBar: vscode.StatusBarItem;
 let timer: NodeJS.Timeout | undefined;
-let cfg: Cfg = { enabled: true, windows: [], weekdays: [], notifyOnChange: true, notifyMinutesBefore: 10 };
+let cfg: Cfg = {
+    enabled: true,
+    windows: [],
+    weekdays: [],
+    notifyOnChange: true,
+    notifyMinutesBefore: 10,
+    monitorStatus: true,
+    statusFeedUrl: DEFAULT_STATUS_FEED,
+    statusCheckIntervalMinutes: 5,
+    notifyOnStatusIncident: true,
+};
 let lastInPeak: boolean | undefined;
 let lastWarnedBoundaryMs = 0;
 
@@ -158,6 +395,10 @@ function readConfig(): void {
         weekdays,
         notifyOnChange: conf.get<boolean>('notifyOnChange', true),
         notifyMinutesBefore: conf.get<number>('notifyMinutesBefore', 10),
+        monitorStatus: conf.get<boolean>('monitorStatus', true),
+        statusFeedUrl: conf.get<string>('statusFeedUrl', DEFAULT_STATUS_FEED),
+        statusCheckIntervalMinutes: conf.get<number>('statusCheckIntervalMinutes', 5),
+        notifyOnStatusIncident: conf.get<boolean>('notifyOnStatusIncident', true),
     };
 }
 
@@ -268,12 +509,19 @@ export function activate(context: vscode.ExtensionContext): void {
     statusBar.command = 'deepseekPeak.showStatus';
     context.subscriptions.push(statusBar);
 
+    feedStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+    feedStatusBar.command = 'deepseekPeak.showStatusFeed';
+    context.subscriptions.push(feedStatusBar);
+
     readConfig();
     schedule();
     tick();
+    scheduleStatus();
+    void checkStatusFeed();
 
     context.subscriptions.push(
         vscode.commands.registerCommand('deepseekPeak.showStatus', showStatusNow),
+        vscode.commands.registerCommand('deepseekPeak.showStatusFeed', showStatusFeedNow),
         vscode.commands.registerCommand('deepseekPeak.openSettings', () => {
             void vscode.commands.executeCommand(
                 'workbench.action.openSettings',
@@ -286,6 +534,16 @@ export function activate(context: vscode.ExtensionContext): void {
                 // Reset warn dedupe when config changes.
                 lastWarnedBoundaryMs = 0;
                 tick();
+                scheduleStatus();
+                const statusSettingsChanged = [
+                    'monitorStatus',
+                    'statusFeedUrl',
+                    'statusCheckIntervalMinutes',
+                    'notifyOnStatusIncident',
+                ].some((k) => e.affectsConfiguration(`deepseekPeak.${k}`));
+                if (statusSettingsChanged) {
+                    void checkStatusFeed();
+                }
             }
         })
     );
@@ -294,5 +552,8 @@ export function activate(context: vscode.ExtensionContext): void {
 export function deactivate(): void {
     if (timer) {
         clearInterval(timer);
+    }
+    if (statusTimer) {
+        clearInterval(statusTimer);
     }
 }

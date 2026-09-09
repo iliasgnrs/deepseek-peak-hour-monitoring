@@ -4,6 +4,10 @@ A VS Code extension that shows you **in the status bar** whether you are **insid
 DeepSeek peak hours** and **when the current peak ends**, based on your computer's clock
 (classification is always done in **UTC**, as DeepSeek defines it).
 
+It also **watches the DeepSeek status page** and notifies you as soon as there is an active
+incident (degraded performance, outage, etc.), so you know when the systems are not
+working well.
+
 > **What DeepSeek peak hours are** (default): Monday–Friday, **01:00–04:00** and
 > **06:00–10:00 UTC**. At all other times you are **off-peak**.
 
@@ -13,6 +17,8 @@ DeepSeek peak hours** and **when the current peak ends**, based on your computer
 - ⏱️ **Countdown** for when the current peak ends (or when the next one starts).
 - 🔔 **Notifications** when the status changes and **shortly before** the change.
 - 🛠️ **Fully configurable** schedule (windows, days, notifications).
+- 🚨 **Status monitoring** (`status.deepseek.com`): a red `DeepSeek issue (n)` indicator and
+  a notification when DeepSeek reports an active incident.
 
 ## Installation
 
@@ -58,6 +64,24 @@ Open the settings (`Ctrl+,`) and search for `deepseekPeak` (or use the
 | `deepseekPeak.weekdays` | number[] | `[1,2,3,4,5]` | Weekdays (0=Sun … 6=Sat) |
 | `deepseekPeak.notifyOnChange` | boolean | `true` | Notify when the status changes |
 | `deepseekPeak.notifyMinutesBefore` | number | `10` | Minutes before the change to warn (0=disabled) |
+| `deepseekPeak.monitorStatus` | boolean | `true` | Monitor the DeepSeek status feed for incidents |
+| `deepseekPeak.statusFeedUrl` | string | `https://status.deepseek.com/feed.rss` | RSS/Atom status feed URL (feed.rss or feed.atom) |
+| `deepseekPeak.statusCheckIntervalMinutes` | number | `5` | How often (minutes) to check the status feed |
+| `deepseekPeak.notifyOnStatusIncident` | boolean | `true` | Notify when a status incident starts or is resolved |
+
+### Status monitoring
+
+While VS Code is running, the extension polls the DeepSeek status feed every
+`statusCheckIntervalMinutes` minutes. Whenever the feed shows an incident that is **not
+resolved** (e.g. `investigating`, `identified`, `monitoring`, `degraded`, `outage`), you
+get:
+
+- a red **`$(error) DeepSeek issue (n)`** indicator in the status bar (click it to see the
+details and links), and
+- a **notification** when the incident starts, and another when it is resolved.
+
+When DeepSeek reports **no active incident**, the status bar stays clean and nothing is
+shown.
 
 ### Example: changing the schedule
 
@@ -81,7 +105,7 @@ your **local timezone** for convenience.
 ```
 ├── package.json      # metadata, commands, settings
 ├── tsconfig.json
-├── src/extension.ts  # all the logic (peak math, status bar, notifications)
+├── src/extension.ts  # all the logic (peak math, status monitoring, notifications)
 └── .vscode/          # debug (F5) + build task
 ```
 
